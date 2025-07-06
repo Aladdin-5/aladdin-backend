@@ -40,7 +40,7 @@ async function bootstrap() {
     const app = await createNestApp();
     const port = process.env.PORT || 3000;
     await app.listen(port);
-    logger.log(`🚀 博客系统BFF启动成功!`);
+    logger.log(`🚀 Aladdin启动成功!`);
     logger.log(`📊 服务地址: http://localhost:${port}`);
     logger.log(`📝 API文档: http://localhost:${port}/api`);
     logger.log(`🌍 环境: ${process.env.NODE_ENV}`);
