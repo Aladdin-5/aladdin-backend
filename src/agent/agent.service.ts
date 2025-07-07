@@ -1,82 +1,76 @@
-import { Injectable } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
-import { CreateAgentDto, UpdateAgentDto } from "../dto/agent.dto";
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateAgentDto } from './dto/create-agent.dto';
+import { UpdateAgentDto } from './dto/update-agent.dto';
 
 @Injectable()
 export class AgentService {
-	constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {}
 
-	async create(createAgentDto: CreateAgentDto) {
-		return this.prisma.agent.create({
-			data: createAgentDto,
-		});
-	}
+  async create(createAgentDto: CreateAgentDto) {
+    return this.prisma.agent.create({
+      data: createAgentDto,
+    });
+  }
 
-	async findAll() {
-		return this.prisma.agent.findMany({
-			include: {
-				jobDistributions: {
-					include: {
-						jobDistribution: true,
-					},
-				},
-			},
-		});
-	}
+  async findAll(skip = 0, take = 10) {
+    const [agents, total] = await Promise.all([
+      this.prisma.agent.findMany({
+        skip,
+        take,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.agent.count(),
+    ]);
 
-	async findOne(id: string) {
-		return this.prisma.agent.findUnique({
-			where: { id },
-			include: {
-				jobDistributions: {
-					include: {
-						jobDistribution: true,
-					},
-				},
-			},
-		});
-	}
+    return {
+      agents,
+      meta: {
+        total,
+        skip,
+        take,
+        hasMore: skip + take < total,
+      },
+    };
+  }
 
-	async findByWalletAddress(walletAddress: string) {
-		return this.prisma.agent.findMany({
-			where: { walletAddress },
-			include: {
-				jobDistributions: {
-					include: {
-						jobDistribution: true,
-					},
-				},
-			},
-		});
-	}
+  async findOne(id: string) {
+    const agent = await this.prisma.agent.findUnique({
+      where: { id },
+      include: {
+        jobDistributions: {
+          include: {
+            jobDistribution: true,
+          },
+        },
+      },
+    });
 
-	async findByTags(tags: string[]) {
-		return this.prisma.agent.findMany({
-			where: {
-				tags: {
-					hasSome: tags,
-				},
-			},
-			include: {
-				jobDistributions: {
-					include: {
-						jobDistribution: true,
-					},
-				},
-			},
-		});
-	}
+    if (!agent) {
+      throw new NotFoundException(`Agent with ID ${id} not found`);
+    }
 
-	async update(id: string, updateAgentDto: UpdateAgentDto) {
-		return this.prisma.agent.update({
-			where: { id },
-			data: updateAgentDto,
-		});
-	}
+    return agent;
+  }
 
-	async remove(id: string) {
-		return this.prisma.agent.delete({
-			where: { id },
-		});
-	}
-}
+  async update(id: string, updateAgentDto: UpdateAgentDto) {
+    try {
+      return await this.prisma.agent.update({
+        where: { id },
+        data: updateAgentDto,
+      });
+    } catch (error) {
+      throw new NotFoundException(`Agent with ID ${id} not found`);
+    }
+  }
+
+  async remove(id: string) {
+    try {
+      return await this.prisma.agent.delete({
+        where: { id },
+      });
+    } catch (error) {
+      throw new NotFoundException(`Agent with ID ${id} not found`);
+    }
+  }
+} 

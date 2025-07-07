@@ -13,5 +13,7 @@ import { JobDistributionModule } from "./job-distribution/job-distribution.modul
 		JobModule,
 		JobDistributionModule,
 	],
+	controllers: [],
+  providers: [],
 })
 export class AppModule {}

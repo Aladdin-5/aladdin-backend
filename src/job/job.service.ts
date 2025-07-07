@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateJobDto, UpdateJobDto } from "../dto/job.dto";
 import { JobStatus } from "@prisma/client";
+import {parseArrayString} from '../utils'
 
 @Injectable()
 export class JobService {
@@ -9,7 +10,11 @@ export class JobService {
 
 	async create(createJobDto: CreateJobDto) {
 		return this.prisma.job.create({
-			data: createJobDto,
+			data: {
+				...createJobDto,
+				deadline: new Date(createJobDto.deadline),
+				tags: Array.isArray(createJobDto.tags) ? createJobDto.tags : parseArrayString(createJobDto.tags),
+			},
 		});
 	}
 
@@ -119,6 +124,15 @@ export class JobService {
 	}
 
 	async update(id: string, updateJobDto: UpdateJobDto) {
+		Object.keys(updateJobDto).forEach(item => {
+			if (item === 'deadline') {
+				updateJobDto[item] = new Date(updateJobDto.deadline)
+			}
+
+			if (item === 'tags') {
+				updateJobDto[item] = Array.isArray(updateJobDto.tags) ? updateJobDto.tags : parseArrayString(updateJobDto.tags)
+			}
+		})
 		return this.prisma.job.update({
 			where: { id },
 			data: updateJobDto,
