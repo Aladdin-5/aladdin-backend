@@ -12,9 +12,14 @@ export class JobController {
     return this.jobService.create(createJobDto);
   }
 
-  @Get()
-  findAll() {
-    return this.jobService.findAll();
+  // @Get()
+  // findAll() {
+  //   return this.jobService.findAll();
+  // }
+
+  @Get('page')
+  findByPage(@Query('skip') skip?: string, @Query('take') take?: string) {
+    return this.jobService.findByPage(skip ? parseInt(skip) : 0, take ? parseInt(take) : 10);
   }
 
   @Get('by-status/:status')
