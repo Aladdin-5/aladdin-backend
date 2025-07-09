@@ -191,4 +191,164 @@ export class JobService {
 			where: { id },
 		});
 	}
+
+	async matchAgents(jobId: string, limit: number = 50, minScore: number = 0) {
+		const job = await this.prisma.job.findUnique({
+			where: { id: jobId },
+		});
+
+		if (!job) {
+			throw new Error(`Job with ID ${jobId} not found`);
+		}
+
+		const availableAgents = await this.prisma.agent.findMany({
+			where: {
+				isActive: true,
+				autoAcceptJobs: true,
+				isPrivate: false,
+			},
+		});
+
+		const matchedAgents = this.calculateMatches(job, availableAgents);
+		const filteredAgents = matchedAgents.filter(agent => agent.matchScore >= minScore);
+		const shuffledAgents = this.shuffleArray(filteredAgents);
+		
+		return {
+			total: filteredAgents.length,
+			agents: shuffledAgents.slice(0, limit),
+			hasMore: filteredAgents.length > limit,
+			matchCriteria: {
+				category: job.category,
+				tags: job.tags,
+				skillLevel: job.skillLevel,
+				priority: job.priority,
+				minScore: minScore,
+				limit: limit
+			}
+		};
+	}
+
+	private calculateMatches(job: any, agents: any[]) {
+		return agents.map(agent => {
+			let score = 0;
+			
+			const categoryMatch = job.category === agent.agentClassification;
+			if (categoryMatch) {
+				score += 50;
+			}
+			
+			const tagIntersection = job.tags.filter(tag => agent.tags.includes(tag));
+			const tagScore = (tagIntersection.length / Math.max(job.tags.length, 1)) * 30;
+			score += tagScore;
+			
+			const reputationScore = agent.reputation * 10;
+			score += reputationScore;
+			
+			const successRateScore = agent.successRate * 10;
+			score += successRateScore;
+
+			return {
+				...agent,
+				matchScore: score,
+				categoryMatch,
+				tagMatches: tagIntersection,
+				tagMatchCount: tagIntersection.length,
+			};
+		}).filter(agent => agent.matchScore > 0)
+		  .sort((a, b) => b.matchScore - a.matchScore);
+	}
+
+	private shuffleArray<T>(array: T[]): T[] {
+		const shuffled = [...array];
+		for (let i = shuffled.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+		}
+		return shuffled;
+	}
+
+	async autoAssignJob(jobId: string) {
+		const job = await this.prisma.job.findUnique({
+			where: { id: jobId },
+			include: {
+				distributionRecord: true,
+			},
+		});
+
+		if (!job) {
+			throw new Error(`Job with ID ${jobId} not found`);
+		}
+
+		if (job.distributionRecord) {
+			throw new Error(`Job ${jobId} has already been distributed`);
+		}
+
+		if (!job.autoAssign) {
+			throw new Error(`Job ${jobId} is not configured for auto-assignment`);
+		}
+
+		const matchResult = await this.matchAgents(jobId, job.allowParallelExecution ? 10 : 1, 30);
+		
+		if (matchResult.agents.length === 0) {
+			throw new Error(`No suitable agents found for job ${jobId}`);
+		}
+
+		return this.assignJobToAgents(jobId, matchResult.agents);
+	}
+
+	async assignJobToAgents(jobId: string, agents: any[]) {
+		const job = await this.prisma.job.findUnique({
+			where: { id: jobId },
+			include: {
+				distributionRecord: true,
+			},
+		});
+
+		if (!job) {
+			throw new Error(`Job with ID ${jobId} not found`);
+		}
+
+		if (job.distributionRecord) {
+			throw new Error(`Job ${jobId} has already been distributed`);
+		}
+
+		if (agents.length === 0) {
+			throw new Error(`No agents provided for assignment`);
+		}
+
+		const distributionRecord = await this.prisma.jobDistributionRecord.create({
+			data: {
+				jobId: job.id,
+				jobName: job.jobTitle,
+				matchCriteria: {
+					category: job.category,
+					tags: job.tags,
+					skillLevel: job.skillLevel,
+					priority: job.priority,
+				},
+				totalAgents: agents.length,
+				assignedAgentId: agents[0].id,
+				assignedAgentName: agents[0].agentName,
+			},
+		});
+
+		const agentDistributions = agents.map(agent => ({
+			jobDistributionId: distributionRecord.id,
+			agentId: agent.id,
+		}));
+
+		await this.prisma.jobDistributionAgent.createMany({
+			data: agentDistributions,
+		});
+
+		await this.prisma.job.update({
+			where: { id: jobId },
+			data: { status: JobStatus.DISTRIBUTED },
+		});
+
+		return {
+			distributionRecord,
+			assignedAgents: agents,
+		};
+	}
 }

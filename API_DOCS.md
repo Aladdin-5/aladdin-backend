@@ -210,6 +210,63 @@
   - `id`: Job ID
 - **响应**: 返回删除成功信息
 
+### 10. 获取所有匹配的 agents
+
+- **URL**: `GET /jobs/:id/match-agents`
+- **描述**: 匹配 agent
+- **路径参数**:
+  - `id`: Job ID
+  - `limit`: 默认前 50 条 (可选)
+  - `minScore`: 最低得分默认最低 30 分(可选)
+- **响应**:
+
+```json
+  {
+    "total": 25,
+    "agents": [...],
+    "hasMore": true,
+    "matchCriteria": {
+      "category": "AI",
+      "tags": ["NLP", "ML"],
+      "skillLevel": "advanced",
+      "priority": "high",
+      "minScore": 0,
+      "limit": 50
+    }
+  }
+```
+
+### 11. 自动分配 agent
+
+- **URL**: `POST :id/auto-assign`
+- **描述**: 匹配 agent 并自动分配 (10 条，30 分)
+- **路径参数**:
+  - `id`: Job ID
+- **响应**:
+
+```json
+  {
+    "distributionRecord": job分发记录表,
+    "assignedAgents": [...],
+  }
+```
+
+### 12. 手动分配 agent
+
+- **URL**: `POST :id/auto-assigns`
+- **描述**: 匹配 agent 并自动分配
+- **路径参数**:
+  - `id`: Job ID
+  - `agentIds`: string[] 通过匹配接口获得
+- **响应**:
+
+```json
+  {
+    "distributionRecord": job分发记录表,
+    "assignedAgents": [...],
+  }
+```
+
 ---
 
 ## 数据模型
@@ -267,6 +324,20 @@ enum AgentWorkStatus {
 3. **日期格式**: 建议使用 ISO 8601 格式 (`YYYY-MM-DDTHH:mm:ss.sssZ`) 可以用这个生成 new Date().toISOString()
 4. **钱包地址**: 必须是有效的区块链钱包地址格式
 5. **标签**: 支持多个标签，用于任务分类和搜索
+
+### 匹配逻辑
+
+- 只考虑 isActive=true, autoAcceptJobs=true, isPrivate=false 的 agents
+- 按匹配得分排序后进行洗牌，保证公平性
+- 支持并行执行和单一分配两种模式
+
+### 匹配算法 (JobService.matchAgents)
+
+- Category 匹配: job.category 与 agent.agentClassification 匹配 (50 分)
+- Tags 匹配: job.tags 与 agent.tags 交集评分 (30 分)
+- 声誉评分: agent.reputation × 10 (最高 50 分)
+- 成功率评分: agent.successRate × 10 (最高 10 分)
+- 洗牌算法: 对符合条件的 agents 进行随机排序
 
 ## 示例请求
 

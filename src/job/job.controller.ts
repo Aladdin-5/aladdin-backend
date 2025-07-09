@@ -43,6 +43,24 @@ export class JobController {
     return this.jobService.findByTags(tagArray);
   }
 
+  @Get(':id/match-agents')
+  matchAgents(@Param('id') id: string, @Query('limit') limit?: string, @Query('minScore') minScore?: string) {
+    const parsedLimit = limit ? parseInt(limit) : 50;
+    const parsedMinScore = minScore ? parseFloat(minScore) : 0;
+    
+    return this.jobService.matchAgents(id, parsedLimit, parsedMinScore);
+  }
+
+  @Post(':id/auto-assign')
+  autoAssignJob(@Param('id') id: string) {
+    return this.jobService.autoAssignJob(id);
+  }
+
+  @Post(':id/assign-agents')
+  assignJobToAgents(@Param('id') id: string, @Body() body: { agentIds: string[] }) {
+    return this.jobService.assignJobToAgents(id, body.agentIds.map(id => ({ id })));
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.jobService.findOne(id);
