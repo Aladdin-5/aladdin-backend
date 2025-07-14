@@ -38,7 +38,7 @@ console.log('process.env.NODE_ENV', process.env.NODE_ENV)
 
 async function bootstrap() {
     const app = await createNestApp();
-    const port = process.env.PORT || 3000;
+    const port = process.env.PORT || 3999;
     await app.listen(port, '0.0.0.0');
     logger.log(`🚀 Aladdin启动成功!`);
     logger.log(`📊 服务地址: http://localhost:${port}`);
@@ -47,6 +47,8 @@ async function bootstrap() {
   }
   
 // 开发环境下启动监听服务
-if (process.env.NODE_ENV === 'development') {
+// if (process.env.NODE_ENV === 'development') {
+//     bootstrap(); 
+// }
+
     bootstrap(); 
-}
