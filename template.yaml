@@ -1,0 +1,120 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 1024
+    Runtime: nodejs20.x
+    Architectures: ["arm64"]
+    Environment:
+      Variables:
+        NODE_OPTIONS: "--enable-source-maps"
+    EphemeralStorage:
+      Size: 512
+  Api:
+    OpenApiVersion: "2.0"
+    Cors:
+      AllowMethods: "'*'"
+      AllowHeaders: "'Content-Type,Authorization'"
+      AllowOrigin: "'*'"
+      MaxAge: 600
+
+Parameters:
+  VpcId:
+    Type: String
+    Default: vpc-00cac416c7647e96d
+    Description: VPC ID where RDS is located
+
+Resources:
+  # Node modules Layer
+  NodeModulesLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: nestjs-dependencies
+      Description: Node modules for NestJS application
+      ContentUri: layer/
+      CompatibleRuntimes:
+        - nodejs20.x
+      RetentionPolicy: Retain
+    Metadata:
+      BuildMethod: nodejs20.x
+
+  # Lambda 安全组
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Lambda function
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: 0.0.0.0/0
+          Description: Allow outbound PostgreSQL traffic
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: Allow HTTPS outbound
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: Allow HTTP outbound
+
+  Api:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: dev
+      BinaryMediaTypes:
+        - "image/*"
+        - "multipart/form-data"
+      Auth:
+        DefaultAuthorizer: NONE
+
+  NestjsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: lambda.handler
+      CodeUri: dist/
+      MemorySize: 3008
+      Timeout: 30
+      Layers:
+        - !Ref NodeModulesLayer
+      Policies:
+        - VPCAccessPolicy: {}
+        - SSMParameterReadPolicy:
+            ParameterName: /aladdin-backend/*
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroup
+        SubnetIds:
+          - subnet-04330773a6f7ff131
+      Events:
+        RootEvent:
+          Type: Api
+          Properties:
+            Path: /
+            Method: ANY
+            RestApiId: !Ref Api
+        ProxyEvent:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+            RestApiId: !Ref Api
+      Environment:
+        Variables:
+          NODE_ENV: production
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${Api}.aladdin.${AWS::Region}.amazonaws.com"
+  FunctionArn:
+    Description: Lambda Function ARN
+    Value: !GetAtt NestjsFunction.Arn
+  LambdaSecurityGroupId:
+    Description: Lambda Security Group ID
+    Value: !Ref LambdaSecurityGroup

@@ -1,0 +1,10 @@
+version = 0.2
+
+[default.deploy.parameters]
+stack_name = "aladdin-backend"
+resolve_s3 = true
+s3_prefix = "aladdin-backend"
+region = "us-west-1"
+capabilities = "CAPABILITY_IAM"
+image_repositories = []
+parameter_overrides = "VpcId=\"vpc-00cac416c7647e96d\""
