@@ -1,7 +1,25 @@
 module.exports = (options, webpack) => {
 	return {
 		...options,
-		externals: [],
+		externals: [
+			"@aws-sdk/client-ssm",
+			"@aws-sdk/rds-signer",
+			"@nestjs/common",
+			"@nestjs/core",
+			"@nestjs/platform-express",
+			"@nestjs/swagger",
+			"@prisma/client",
+			"aws-serverless-express",
+			"axios",
+			"class-transformer",
+			"class-validator",
+			"express",
+			"reflect-metadata",
+			"rxjs",
+			"tslib",
+			"uid",
+			"prisma",
+		],
 		module: {
 			rules: [
 				{
