@@ -3,7 +3,7 @@ Transform: AWS::Serverless-2016-10-31
 
 Globals:
   Function:
-    Timeout: 30
+    Timeout: 60
     MemorySize: 1024
     Runtime: nodejs20.x
     Architectures: ["arm64"]
@@ -79,7 +79,7 @@ Resources:
       Handler: lambda.handler
       CodeUri: dist/
       MemorySize: 3008
-      Timeout: 30
+      Timeout: 60
       Layers:
         - !Ref NodeModulesLayer
       Policies:
@@ -91,6 +91,7 @@ Resources:
           - !Ref LambdaSecurityGroup
         SubnetIds:
           - subnet-04330773a6f7ff131
+          - subnet-0e6e4ff6de97f313f
       Events:
         RootEvent:
           Type: Api
@@ -111,7 +112,7 @@ Resources:
 Outputs:
   ApiEndpoint:
     Description: API Gateway endpoint URL
-    Value: !Sub "https://${Api}.aladdin.${AWS::Region}.amazonaws.com"
+    Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/dev"
   FunctionArn:
     Description: Lambda Function ARN
     Value: !GetAtt NestjsFunction.Arn

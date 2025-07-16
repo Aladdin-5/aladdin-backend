@@ -31,7 +31,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
       const databaseMainUrl = databaseMain.Parameter?.Value;
 
-      console.log('成功获取数据库连接字符串，正在初始化 Prisma 客户端...',databaseMainUrl);
+      console.log('成功获取数据库连接字符串，正在初始化 Prisma 客户端...');
 
       // 使用获取到的连接字符串初始化 Prisma 客户端
       this.prisma = new PrismaClient({
