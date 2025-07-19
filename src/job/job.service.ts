@@ -40,7 +40,7 @@ export class JobService {
 	}
 
 	async findByPage(skip = 0, take = 10) {
-    const [agents, total] = await Promise.all([
+    const [jobs, total] = await Promise.all([
       this.prisma.job.findMany({
         skip,
         take,
@@ -50,7 +50,7 @@ export class JobService {
     ]);
 
     return {
-      agents,
+      jobs,
       meta: {
         total,
         skip,

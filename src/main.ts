@@ -12,8 +12,10 @@ export async function createNestApp() {
   
   // 启用CORS
   app.enableCors({
-    origin: true,
-    credentials: true,
+    origin: '*',
+    methods: '*',
+    allowedHeaders: '*',
+    credentials: false, // 注意：通配符时不能使用 credentials: true
   });
   
   // 设置全局前缀

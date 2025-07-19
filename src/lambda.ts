@@ -15,7 +15,12 @@ async function createServer() {
     const app = await NestFactory.create(AppModule, adapter);
     
     // 启用 CORS
-    app.enableCors();
+    app.enableCors({
+      origin: '*',
+      methods: '*',
+      allowedHeaders: '*',
+      credentials: false, // 注意：通配符时不能使用 credentials: true
+    });
     
     // Lambda 环境下不使用全局前缀，直接在根路径提供服务
     // app.setGlobalPrefix('api');
