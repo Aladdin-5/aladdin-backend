@@ -32,6 +32,15 @@ export class ConfigService {
     return this.configService.get<string>('LOG_LEVEL', 'info');
   }
 
+  // AWS配置
+  get jobsSqsUrlParameter(): string {
+    return this.configService.get<string>('JOBS_SQS_URL_PARAMETER', '/aladdin-backend/jobsSqsUrl');
+  }
+
+  get awsRegion(): string {
+    return this.configService.get<string>('AWS_REGION', 'us-west-1');
+  }
+
   // 是否开发环境
   get isDevelopment(): boolean {
     return this.nodeEnv === 'development';

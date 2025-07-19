@@ -17,6 +17,7 @@
   "license": "ISC",
   "packageManager": "pnpm@10.6.3",
   "dependencies": {
+    "@aws-sdk/client-sqs": "^3.848.0",
     "@aws-sdk/client-ssm": "^3.835.0",
     "@aws-sdk/rds-signer": "^3.478.0",
     "@nestjs/common": "^10.3.0",

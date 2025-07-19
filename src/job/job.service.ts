@@ -3,13 +3,17 @@ import { PrismaService } from "../prisma/prisma.service";
 import { CreateJobDto, UpdateJobDto } from "../dto/job.dto";
 import { JobStatus } from "@prisma/client";
 import { parseArrayString, parseBoolean } from '../utils'
+import { SqsService } from "../aws/sqs.service";
 
 @Injectable()
 export class JobService {
-	constructor(private prisma: PrismaService) {}
+	constructor(
+		private prisma: PrismaService,
+		private sqsService: SqsService
+	) {}
 
 	async create(createJobDto: CreateJobDto) {
-		return this.prisma.job.create({
+		const job = await this.prisma.job.create({
 			data: {
 				...createJobDto,
 				deadline: new Date(createJobDto.deadline),
@@ -21,6 +25,16 @@ export class JobService {
 				isPublic: parseBoolean(createJobDto.isPublic),
 			},
 		});
+
+		// 发送Job创建消息到SQS队列
+		try {
+			await this.sqsService.sendJobCreatedMessage(job.id);
+		} catch (error) {
+			console.error(`Failed to send job created message to SQS: ${error.message}`, error);
+			// 不阻止正常流程，即使SQS发送失败也返回创建的Job
+		}
+
+		return job;
 	}
 
 	async findAll() {

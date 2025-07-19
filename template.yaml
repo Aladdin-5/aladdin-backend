@@ -63,6 +63,20 @@ Resources:
           CidrIp: 0.0.0.0/0
           Description: Allow HTTP outbound
 
+  # SQS 队列
+  JobsQueue:  # 逻辑 ID，模板内唯一
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: jobsEmitter  # 必须与图片中的名称完全一致
+      VisibilityTimeout: 60  # 默认值（秒），按需调整
+      MessageRetentionPeriod: 345600  # 消息保留4天（默认值）
+      # 加密配置（与图片一致）
+      SqsManagedSseEnabled: true  # 使用 SSE-SQS 加密
+      # 死信队列（图片中未配置，按需添加）
+      # RedrivePolicy:
+      #   deadLetterTargetArn: !GetAtt DLQ.Arn
+      #   maxReceiveCount: 3
+
   Api:
     Type: AWS::Serverless::Api
     Properties:
@@ -86,6 +100,8 @@ Resources:
         - VPCAccessPolicy: {}
         - SSMParameterReadPolicy:
             ParameterName: /aladdin-backend/*
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt JobsQueue.QueueName
       VpcConfig:
         SecurityGroupIds:
           - !Ref LambdaSecurityGroup
@@ -105,6 +121,12 @@ Resources:
             Path: /{proxy+}
             Method: ANY
             RestApiId: !Ref Api
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt JobsQueue.Arn
+            BatchSize: 10
+            Enabled: true
       Environment:
         Variables:
           NODE_ENV: production
@@ -116,6 +138,12 @@ Outputs:
   FunctionArn:
     Description: Lambda Function ARN
     Value: !GetAtt NestjsFunction.Arn
+  JobsQueueUrl:
+    Description: Jobs SQS Queue URL
+    Value: !Ref JobsQueue
+  JobsQueueArn:
+    Description: Jobs SQS Queue ARN
+    Value: !GetAtt JobsQueue.Arn
   LambdaSecurityGroupId:
     Description: Lambda Security Group ID
     Value: !Ref LambdaSecurityGroup
