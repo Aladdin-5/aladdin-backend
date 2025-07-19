@@ -231,6 +231,8 @@ export class JobService {
 	private calculateMatches(job: any, agents: any[]) {
 		return agents.map(agent => {
 			let score = 0;
+			let priceMatch = false;
+			let agentPrice = 0;
 			
 			const categoryMatch = job.category === agent.agentClassification;
 			if (categoryMatch) {
@@ -240,6 +242,35 @@ export class JobService {
 			const tagIntersection = job.tags.filter(tag => agent.tags.includes(tag));
 			const tagScore = (tagIntersection.length / Math.max(job.tags.length, 1)) * 30;
 			score += tagScore;
+			
+			// 价格匹配逻辑
+			let jobMinBudget = 0;
+			let jobMaxBudget = 0;
+			
+			// 解析 job 的 budget 字段
+			if (typeof job.budget === 'object' && job.budget !== null) {
+				jobMinBudget = job.budget.min || 0;
+				jobMaxBudget = job.budget.max || job.maxBudget || Infinity;
+			} else if (typeof job.budget === 'number') {
+				jobMinBudget = job.budget;
+				jobMaxBudget = job.maxBudget || job.budget;
+			}
+			
+			// 根据 agent 的计费模式获取价格
+			agentPrice = agent.pricePerCall;
+			
+			// 检查价格是否在预算范围内
+			if (agentPrice > 0 && agentPrice >= jobMinBudget && agentPrice <= jobMaxBudget) {
+				priceMatch = true;
+				// 价格匹配加分：越接近预算下限，分数越高
+				const priceRange = jobMaxBudget - jobMinBudget;
+				if (priceRange > 0) {
+					const priceScore = ((jobMaxBudget - agentPrice) / priceRange) * 20;
+					score += priceScore;
+				} else {
+					score += 20; // 完全匹配加20分
+				}
+			}
 			
 			const reputationScore = agent.reputation * 10;
 			score += reputationScore;
@@ -253,8 +284,11 @@ export class JobService {
 				categoryMatch,
 				tagMatches: tagIntersection,
 				tagMatchCount: tagIntersection.length,
+				priceMatch,
+				agentPrice,
+				jobBudgetRange: { min: jobMinBudget, max: jobMaxBudget },
 			};
-		}).filter(agent => agent.matchScore > 0)
+		}).filter(agent => agent.matchScore > 0 && agent.priceMatch) // 只返回价格匹配的 agent
 		  .sort((a, b) => b.matchScore - a.matchScore);
 	}
 
