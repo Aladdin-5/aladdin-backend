@@ -1,9 +1,10 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateJobDto, UpdateJobDto } from "../dto/job.dto";
-import { JobStatus } from "@prisma/client";
+import { JobStatus, AgentWorkStatus } from "@prisma/client";
 import { parseArrayString, parseBoolean } from '../utils'
 import { SqsService } from "../aws/sqs.service";
+import axios from 'axios';
 
 @Injectable()
 export class JobService {
@@ -64,7 +65,7 @@ export class JobService {
         take,
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.agent.count(),
+      this.prisma.job.count(),
     ]);
 
     return {
@@ -112,21 +113,39 @@ export class JobService {
 		});
 	}
 
-	async findByWalletAddress(walletAddress: string) {
-		return this.prisma.job.findMany({
-			where: { walletAddress },
-			include: {
-				distributionRecord: {
-					include: {
-						assignedAgents: {
-							include: {
-								agent: true,
+	async findByWalletAddress(walletAddress: string, skip = 0, take = 10) {
+		const [jobs, total] = await Promise.all([
+			this.prisma.job.findMany({
+				where: { walletAddress },
+				skip,
+				take,
+				orderBy: { createdAt: 'desc' },
+				include: {
+					distributionRecord: {
+						include: {
+							assignedAgents: {
+								include: {
+									agent: true,
+								},
 							},
 						},
 					},
 				},
+			}),
+			this.prisma.job.count({
+				where: { walletAddress },
+			}),
+		]);
+
+		return {
+			jobs,
+			meta: {
+				total,
+				skip,
+				take,
+				hasMore: skip + take < total,
 			},
-		});
+		};
 	}
 
 	async findByCategory(category: string) {
@@ -339,7 +358,7 @@ export class JobService {
 			throw new Error(`Job ${jobId} is not configured for auto-assignment`);
 		}
 
-		const matchResult = await this.matchAgents(jobId, job.allowParallelExecution ? 10 : 1, 30);
+		const matchResult = await this.matchAgents(jobId, job.allowParallelExecution ? 10 : 1, 0);
 		
 		if (matchResult.agents.length === 0) {
 			throw new Error(`No suitable agents found for job ${jobId}`);
@@ -398,9 +417,230 @@ export class JobService {
 			data: { status: JobStatus.DISTRIBUTED },
 		});
 
+		// 异步调用 Agent 地址获取回调结果
+		this.fetchAgentResults(jobId, agents, job);
+
 		return {
 			distributionRecord,
 			assignedAgents: agents,
+		};
+	}
+
+	private async fetchAgentResults(jobId: string, agents: any[], job: any) {
+		this.logger.log(`开始为任务 ${jobId} 调用 ${agents.length} 个 Agent`);
+
+		for (const agent of agents) {
+			const startTime = Date.now();
+			try {
+				// 更新 Agent 状态为工作中
+				await this.updateAgentWorkStatus(jobId, agent.id, AgentWorkStatus.WORKING);
+				
+				this.logger.log(`正在调用 Agent: ${agent.agentName} (${agent.agentAddress})`);
+				
+				// 准备发送给 Agent 的任务数据
+				// {
+				// 	jobId: job.id,
+				// 	jobTitle: job.jobTitle,
+				// 	description: job.description,
+				// 	deliverables: job.deliverables,
+				// 	deadline: job.deadline,
+				// 	tags: job.tags,
+				// 	category: job.category,
+				// 	skillLevel: job.skillLevel,
+				// 	priority: job.priority
+				// };
+				const runId = agent.agentAddress.split('/')[length-2]
+
+				const taskData = {
+					"messages": [{ "role": "user", "content": job.description }],
+					"runId": runId,
+					"maxRetries": 2,
+					"maxSteps": 5,
+					"temperature": 0.5,
+					"topP": 1,
+					"runtimeContext": {}
+				}
+
+				// 调用 Agent 的 API
+				const response = await axios.post(agent.agentAddress, taskData, {
+					timeout: 120000, // 2分钟超时
+					headers: {
+						'Content-Type': 'application/json',
+						'User-Agent': 'Aladdin-Backend/1.0'
+					}
+				});
+
+				const executionTime = Date.now() - startTime;
+				
+				// 保存执行结果
+				await this.saveAgentResult(
+					jobId, 
+					agent.id, 
+					response.data, 
+					AgentWorkStatus.COMPLETED,
+					executionTime
+				);
+
+				this.logger.log(`Agent ${agent.agentName} 执行成功，耗时 ${executionTime}ms`);
+
+			} catch (error) {
+				const executionTime = Date.now() - startTime;
+				const errorMessage = error.response?.data?.message || error.message || '未知错误';
+				
+				this.logger.error(`Agent ${agent.agentName} 执行失败: ${errorMessage}`);
+				
+				// 保存错误结果
+				await this.saveAgentResult(
+					jobId, 
+					agent.id, 
+					null, 
+					AgentWorkStatus.FAILED,
+					executionTime,
+					errorMessage
+				);
+			}
+		}
+
+		// 检查是否所有 Agent 都已完成
+		await this.checkJobCompletion(jobId);
+	}
+
+	private async updateAgentWorkStatus(jobId: string, agentId: string, status: AgentWorkStatus) {
+		await this.prisma.jobDistributionAgent.updateMany({
+			where: {
+				agentId: agentId,
+				jobDistribution: {
+					jobId: jobId
+				}
+			},
+			data: {
+				workStatus: status,
+				startedAt: status === AgentWorkStatus.WORKING ? new Date() : undefined,
+				completedAt: (status === AgentWorkStatus.COMPLETED || status === AgentWorkStatus.FAILED) ? new Date() : undefined
+			}
+		});
+	}
+
+	private async saveAgentResult(
+		jobId: string, 
+		agentId: string, 
+		result: any, 
+		status: AgentWorkStatus,
+		executionTime: number,
+		errorMessage?: string
+	) {
+		const resultText = result ? JSON.stringify(result, null, 2) : null;
+		
+		await this.prisma.jobDistributionAgent.updateMany({
+			where: {
+				agentId: agentId,
+				jobDistribution: {
+					jobId: jobId
+				}
+			},
+			data: {
+				workStatus: status,
+				executionResult: resultText,
+				completedAt: new Date(),
+				executionTimeMs: executionTime,
+				errorMessage: errorMessage,
+				progress: status === AgentWorkStatus.COMPLETED ? 100 : 0
+			}
+		});
+	}
+
+	private async checkJobCompletion(jobId: string) {
+		// 获取任务的所有 Agent 执行状态
+		const distributionRecord = await this.prisma.jobDistributionRecord.findFirst({
+			where: { jobId },
+			include: {
+				assignedAgents: {
+					include: { agent: true }
+				}
+			}
+		});
+
+		if (!distributionRecord) return;
+
+		const allCompleted = distributionRecord.assignedAgents.every(
+			agent => agent.workStatus === AgentWorkStatus.COMPLETED || agent.workStatus === AgentWorkStatus.FAILED
+		);
+
+		if (allCompleted) {
+			const hasSuccessful = distributionRecord.assignedAgents.some(
+				agent => agent.workStatus === AgentWorkStatus.COMPLETED
+			);
+
+			// 更新任务状态
+			await this.prisma.job.update({
+				where: { id: jobId },
+				data: {
+					status: hasSuccessful ? JobStatus.COMPLETED : JobStatus.CANCELLED
+				}
+			});
+
+			this.logger.log(`任务 ${jobId} 已${hasSuccessful ? '完成' : '失败'}`);
+		}
+	}
+
+	async getExecutionResults(jobId: string) {
+		const distributionRecord = await this.prisma.jobDistributionRecord.findFirst({
+			where: { jobId },
+			include: {
+				job: true,
+				assignedAgents: {
+					include: {
+						agent: {
+							select: {
+								id: true,
+								agentName: true,
+								agentAddress: true,
+								reputation: true,
+								successRate: true
+							}
+						}
+					},
+					orderBy: {
+						assignedAt: 'asc'
+					}
+				}
+			}
+		});
+
+		if (!distributionRecord) {
+			throw new Error(`No distribution record found for job ${jobId}`);
+		}
+
+		const results = distributionRecord.assignedAgents.map(agentRecord => ({
+			agent: agentRecord.agent,
+			workStatus: agentRecord.workStatus,
+			assignedAt: agentRecord.assignedAt,
+			startedAt: agentRecord.startedAt,
+			completedAt: agentRecord.completedAt,
+			executionTimeMs: agentRecord.executionTimeMs,
+			progress: agentRecord.progress,
+			retryCount: agentRecord.retryCount,
+			executionResult: agentRecord.executionResult,
+			errorMessage: agentRecord.errorMessage
+		}));
+
+		const summary = {
+			total: results.length,
+			completed: results.filter(r => r.workStatus === AgentWorkStatus.COMPLETED).length,
+			failed: results.filter(r => r.workStatus === AgentWorkStatus.FAILED).length,
+			working: results.filter(r => r.workStatus === AgentWorkStatus.WORKING).length,
+			assigned: results.filter(r => r.workStatus === AgentWorkStatus.ASSIGNED).length
+		};
+
+		return {
+			job: {
+				id: distributionRecord.job.id,
+				jobTitle: distributionRecord.job.jobTitle,
+				status: distributionRecord.job.status,
+				createdAt: distributionRecord.job.createdAt
+			},
+			summary,
+			results
 		};
 	}
 }

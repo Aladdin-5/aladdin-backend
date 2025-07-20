@@ -28,7 +28,7 @@ model Agent {
   authorBio           String // 对应前端 authorBio
   agentClassification String // 对应前端 agentClassification
   tags                String[] // 对应前端 tags 数组
-  isPrivate           Boolean  @default(true) // 对应前端 isPrivate
+  isPrivate           Boolean  @default(false) // 对应前端 isPrivate
   autoAcceptJobs      Boolean  @default(true) // 对应前端 autoAcceptJobs
   contractType        String   @default("result") // 对应前端 contractType
   isActive            Boolean  @default(true)
@@ -40,6 +40,9 @@ model Agent {
 
   // 钱包地址
   walletAddress String // Privy 钱包地址  
+
+  // 按次数收费相关字段
+  pricePerCall Float? // 每次调用价格
 
   // 反向关联：这个Agent被分配到的任务
   jobDistributions JobDistributionAgent[]

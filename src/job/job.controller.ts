@@ -42,9 +42,19 @@ export class JobController {
   @Get('by-wallet/:walletAddress')
   @ApiOperation({ summary: '按钱包地址获取任务' })
   @ApiParam({ name: 'walletAddress', description: '钱包地址' })
+  @ApiQuery({ name: 'skip', description: '跳过数量', required: false, type: Number })
+  @ApiQuery({ name: 'take', description: '获取数量', required: false, type: Number })
   @ApiResponse({ status: 200, description: '获取成功' })
-  findByWalletAddress(@Param('walletAddress') walletAddress: string) {
-    return this.jobService.findByWalletAddress(walletAddress);
+  findByWalletAddress(
+    @Param('walletAddress') walletAddress: string,
+    @Query('skip') skip?: string, 
+    @Query('take') take?: string
+  ) {
+    return this.jobService.findByWalletAddress(
+      walletAddress, 
+      skip ? parseInt(skip) : 0, 
+      take ? parseInt(take) : 10
+    );
   }
 
   @Get('by-category/:category')
@@ -73,7 +83,7 @@ export class JobController {
   matchAgents(@Param('id') id: string, @Query('limit') limit?: string, @Query('minScore') minScore?: string) {
     const parsedLimit = limit ? parseInt(limit) : 50;
     const parsedMinScore = minScore ? parseFloat(minScore) : 0;
-    
+
     return this.jobService.matchAgents(id, parsedLimit, parsedMinScore);
   }
 
@@ -118,6 +128,14 @@ export class JobController {
   @ApiResponse({ status: 200, description: '更新成功' })
   update(@Param('id') id: string, @Body() updateJobDto: UpdateJobDto) {
     return this.jobService.update(id, updateJobDto);
+  }
+
+  @Get(':id/execution-results')
+  @ApiOperation({ summary: '获取任务执行结果' })
+  @ApiParam({ name: 'id', description: '任务ID' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  getExecutionResults(@Param('id') id: string) {
+    return this.jobService.getExecutionResults(id);
   }
 
   @Delete(':id')

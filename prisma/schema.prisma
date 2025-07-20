@@ -28,7 +28,7 @@ model Agent {
   authorBio           String // 对应前端 authorBio
   agentClassification String // 对应前端 agentClassification
   tags                String[] // 对应前端 tags 数组
-  isPrivate           Boolean  @default(true) // 对应前端 isPrivate
+  isPrivate           Boolean  @default(false) // 对应前端 isPrivate
   autoAcceptJobs      Boolean  @default(true) // 对应前端 autoAcceptJobs
   contractType        String   @default("result") // 对应前端 contractType
   isActive            Boolean  @default(true)

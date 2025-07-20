@@ -92,12 +92,12 @@ async function handleSQSEvent(event: SQSEvent, context: Context): Promise<any> {
           logger.log(`Found job: ${job.jobTitle}`);
           
           // 匹配Agent
-          const matchResult = await jobService.matchAgents(jobId, job.allowParallelExecution ? 10 : 1, 30);
+          // const matchResult = await jobService.matchAgents(jobId, job.allowParallelExecution ? 10 : 1, 30);
           
-          logger.log(`Found ${matchResult.agents.length} matching agents`);
+          // logger.log(`Found ${matchResult.agents.length} matching agents`);
           
           // 如果配置了自动分配，执行分配
-          if (job.autoAssign && matchResult.agents.length > 0) {
+          if (job.autoAssign) {
             const result = await jobService.autoAssignJob(jobId);
             logger.log(`Job ${jobId} has been auto-assigned`);
           } else {
