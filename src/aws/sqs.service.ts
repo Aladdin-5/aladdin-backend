@@ -38,6 +38,7 @@ export class SqsService {
       });
       
       const response = await this.ssmClient.send(command);
+      this.logger.debug(`SSM参数 ${paramName} 值: ${response.Parameter?.Value}`);
       if (!response.Parameter?.Value) {
         throw new Error(`Parameter ${paramName} not found or has no value`);
       }

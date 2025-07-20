@@ -99,11 +99,8 @@ Resources:
       Policies:
         - VPCAccessPolicy: {}
         - SSMParameterReadPolicy:
-            ParameterName: /aladdin-backend/*
-        - SQSSendMessagePolicy:  # 发送消息
-            QueueName: !GetAtt JobsQueue.QueueName
-        - SQSReceiveMessagePolicy:  # 接收/删除消息
-            QueueName: !GetAtt JobsQueue.QueueName
+            ParameterName: aladdin-backend/*
+        - AmazonSQSFullAccess
       VpcConfig:
         SecurityGroupIds:
           - !Ref LambdaSecurityGroup
