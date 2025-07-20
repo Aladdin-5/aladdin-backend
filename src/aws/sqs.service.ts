@@ -100,14 +100,21 @@ export class SqsService {
    * @param jobId 任务ID
    */
   async sendJobCreatedMessage(jobId: string): Promise<string> {
+    this.logger.debug(`构建任务创建消息: jobId=${jobId}`);
+    
     const messageBody = JSON.stringify({
       type: 'JOB_CREATED',
       data: { jobId },
       timestamp: new Date().toISOString(),
     });
     
-    return this.sendMessage(messageBody, {
+    this.logger.debug(`消息内容: ${messageBody}`);
+    
+    const messageId = await this.sendMessage(messageBody, {
       messageType: 'JOB_CREATED',
     });
+    
+    this.logger.debug(`任务创建消息已发送: jobId=${jobId}, messageId=${messageId}`);
+    return messageId;
   }
 } 

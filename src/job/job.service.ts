@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateJobDto, UpdateJobDto } from "../dto/job.dto";
 import { JobStatus } from "@prisma/client";
@@ -7,6 +7,8 @@ import { SqsService } from "../aws/sqs.service";
 
 @Injectable()
 export class JobService {
+	private readonly logger = new Logger(JobService.name);
+	
 	constructor(
 		private prisma: PrismaService,
 		private sqsService: SqsService
@@ -28,9 +30,11 @@ export class JobService {
 
 		// 发送Job创建消息到SQS队列
 		try {
-			await this.sqsService.sendJobCreatedMessage(job.id);
+			this.logger.log(`准备发送任务创建消息到SQS队列: jobId=${job.id}, jobTitle=${job.jobTitle || '未命名'}`);
+			const messageId = await this.sqsService.sendJobCreatedMessage(job.id);
+			this.logger.log(`成功发送任务创建消息到SQS队列: jobId=${job.id}, messageId=${messageId}`);
 		} catch (error) {
-			console.error(`Failed to send job created message to SQS: ${error.message}`, error);
+			this.logger.error(`发送任务创建消息到SQS队列失败: jobId=${job.id}, 错误=${error.message}`, error.stack);
 			// 不阻止正常流程，即使SQS发送失败也返回创建的Job
 		}
 
