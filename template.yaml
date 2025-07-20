@@ -100,7 +100,9 @@ Resources:
         - VPCAccessPolicy: {}
         - SSMParameterReadPolicy:
             ParameterName: /aladdin-backend/*
-        - SQSSendMessagePolicy:
+        - SQSSendMessagePolicy:  # 发送消息
+            QueueName: !GetAtt JobsQueue.QueueName
+        - SQSReceiveMessagePolicy:  # 接收/删除消息
             QueueName: !GetAtt JobsQueue.QueueName
       VpcConfig:
         SecurityGroupIds:
