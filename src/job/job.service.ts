@@ -449,11 +449,11 @@ export class JobService {
 				// 	skillLevel: job.skillLevel,
 				// 	priority: job.priority
 				// };
-				const runId = agent.agentAddress.split('/')[length-2]
+				const runIdList = agent.agentAddress.split('/');
 
 				const taskData = {
 					"messages": [{ "role": "user", "content": job.description }],
-					"runId": runId,
+					"runId": runIdList[runIdList.length - 2],
 					"maxRetries": 2,
 					"maxSteps": 5,
 					"temperature": 0.5,
