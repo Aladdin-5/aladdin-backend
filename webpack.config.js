@@ -5,6 +5,7 @@ module.exports = (options, webpack) => {
 			"@aws-sdk/client-ssm",
 			"@aws-sdk/rds-signer",
 			"@nestjs/common",
+			"@nestjs/config",
 			"@nestjs/core",
 			"@nestjs/platform-express",
 			"@nestjs/swagger",
