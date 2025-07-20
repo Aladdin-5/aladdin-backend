@@ -5,6 +5,7 @@ import { AppModule } from './app.module';
 import * as awsServerlessExpress from 'aws-serverless-express';
 import * as express from 'express';
 import { Logger } from '@nestjs/common';
+import { JobService } from './job/job.service';
 
 const logger = new Logger('Lambda');
 let cachedServer: any;
@@ -68,7 +69,7 @@ async function handleSQSEvent(event: SQSEvent, context: Context): Promise<any> {
   
   try {
     // 获取JobService
-    const jobService = app.get('JobService');
+    const jobService = app.get(JobService);
     
     for (const record of event.Records) {
       try {
