@@ -418,7 +418,7 @@ export class JobService {
 		});
 
 		// 异步调用 Agent 地址获取回调结果
-		this.fetchAgentResults(jobId, agents, job);
+		await this.fetchAgentResults(jobId, agents, job);
 
 		return {
 			distributionRecord,
@@ -450,6 +450,8 @@ export class JobService {
 				// 	priority: job.priority
 				// };
 				const runIdList = agent.agentAddress.split('/');
+
+				this.logger.log(`正在调用 runId: ${runIdList} (${runIdList[runIdList.length - 2]}), ${job.description}`);
 
 				const taskData = {
 					"messages": [{ "role": "user", "content": job.description }],
