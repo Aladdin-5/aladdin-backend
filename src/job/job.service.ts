@@ -249,7 +249,7 @@ export class JobService {
 		const matchedAgents = this.calculateMatches(job, availableAgents);
 		const filteredAgents = matchedAgents.filter(agent => agent.matchScore >= minScore);
 		const shuffledAgents = this.shuffleArray(filteredAgents);
-		
+	
 		return {
 			total: filteredAgents.length,
 			agents: shuffledAgents.slice(0, limit),
@@ -358,7 +358,7 @@ export class JobService {
 			throw new Error(`Job ${jobId} is not configured for auto-assignment`);
 		}
 
-		const matchResult = await this.matchAgents(jobId, job.allowParallelExecution ? 10 : 1, 0);
+		const matchResult = await this.matchAgents(jobId, job.allowParallelExecution ? 10 : 10, 0);
 		
 		if (matchResult.agents.length === 0) {
 			throw new Error(`No suitable agents found for job ${jobId}`);
