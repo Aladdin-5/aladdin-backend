@@ -34,7 +34,7 @@ export class ConfigService {
 
   // AWS配置
   get jobsSqsUrlParameter(): string {
-    return this.configService.get<string>('JOBS_SQS_URL_PARAMETER', '/aladdin-backend/jobsSqsUrl');
+    return this.configService.get<string>('JOBS_SQS_URL_PARAMETER', '/aladdin-backend/jobSqsUrl');
   }
 
   get awsRegion(): string {

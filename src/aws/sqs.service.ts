@@ -27,6 +27,7 @@ export class SqsService {
    * 获取SQS队列URL
    */
   async getSqsUrl(): Promise<string> {
+    return 'https://vpce-0480503004b5831bd-raqjichu.sqs.us-west-1.vpce.amazonaws.com/255870378034/jobsEmitter'
     if (this.sqsUrl) {
       return this.sqsUrl;
     }

@@ -6,9 +6,11 @@ import * as awsServerlessExpress from 'aws-serverless-express';
 import * as express from 'express';
 import { Logger } from '@nestjs/common';
 import { JobService } from './job/job.service';
+import { PrismaService } from './prisma/prisma.service';
 
 const logger = new Logger('Lambda');
 let cachedServer: any;
+let cachedApp: any;
 
 async function createServer() {
   if (!cachedServer) {
@@ -16,6 +18,7 @@ async function createServer() {
     const adapter = new ExpressAdapter(expressApp);
     
     const app = await NestFactory.create(AppModule, adapter);
+    cachedApp = app; // 缓存NestJS应用实例
     
     // 启用 CORS
     app.enableCors({
@@ -34,6 +37,14 @@ async function createServer() {
   }
   
   return cachedServer;
+}
+
+// 获取缓存的NestJS应用实例
+async function getApp() {
+  if (!cachedApp) {
+    await createServer(); // 这会同时设置cachedApp
+  }
+  return cachedApp;
 }
 
 export const handler = async (
@@ -64,10 +75,10 @@ async function handleAPIEvent(event: APIGatewayProxyEvent, context: Context): Pr
 async function handleSQSEvent(event: SQSEvent, context: Context): Promise<any> {
   logger.log(`Processing ${event.Records.length} SQS messages`);
   
-  // 创建NestJS应用实例
-  const app = await NestFactory.create(AppModule);
-  
   try {
+    // 获取缓存的NestJS应用实例
+    const app = await getApp();
+    
     // 获取JobService
     const jobService = app.get(JobService);
     
@@ -81,27 +92,32 @@ async function handleSQSEvent(event: SQSEvent, context: Context): Promise<any> {
           const jobId = message.data.jobId;
           logger.log(`Processing job created message for job ID: ${jobId}`);
           
-          // 获取Job信息
-          const job = await jobService.findOne(jobId);
-          
-          if (!job) {
-            logger.error(`Job with ID ${jobId} not found`);
-            continue;
-          }
-          
-          logger.log(`Found job: ${job.jobTitle}`);
-          
-          // 匹配Agent
-          // const matchResult = await jobService.matchAgents(jobId, job.allowParallelExecution ? 10 : 1, 30);
-          
-          // logger.log(`Found ${matchResult.agents.length} matching agents`);
-          
-          // 如果配置了自动分配，执行分配
-          if (job.autoAssign) {
-            const result = await jobService.autoAssignJob(jobId);
-            logger.log(`Job ${jobId} has been auto-assigned`);
-          } else {
-            logger.log(`Job ${jobId} is not configured for auto-assignment or no matching agents found`);
+          try {
+            // 获取Job信息
+            logger.log(`尝试获取任务信息: jobId=${jobId}`);
+            const job = await jobService.findOne(jobId);
+            
+            if (!job) {
+              logger.error(`Job with ID ${jobId} not found`);
+              continue;
+            }
+            
+            logger.log(`Found job: ${job.jobTitle}`);
+            
+            // 如果配置了自动分配，执行分配
+            if (job.autoAssign) {
+              logger.log(`任务配置了自动分配，准备执行分配: jobId=${jobId}`);
+              try {
+                const result = await jobService.autoAssignJob(jobId);
+                logger.log(`Job ${jobId} has been auto-assigned`);
+              } catch (assignError) {
+                logger.error(`自动分配任务失败: jobId=${jobId}, 错误=${assignError.message}`, assignError.stack);
+              }
+            } else {
+              logger.log(`Job ${jobId} is not configured for auto-assignment`);
+            }
+          } catch (jobError) {
+            logger.error(`处理任务时出错: jobId=${jobId}, 错误=${jobError.message}`, jobError.stack);
           }
         } else {
           logger.warn(`Unknown message type: ${message.type}`);
@@ -111,9 +127,8 @@ async function handleSQSEvent(event: SQSEvent, context: Context): Promise<any> {
         // 不抛出异常，继续处理其他消息
       }
     }
-  } finally {
-    // 关闭NestJS应用
-    await app.close();
+  } catch (error) {
+    logger.error(`处理SQS消息时发生错误: ${error.message}`, error.stack);
   }
   
   logger.log('SQS message processing completed');
