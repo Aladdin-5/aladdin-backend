@@ -6,6 +6,7 @@ import { JobModule } from "./job/job.module";
 import { JobDistributionModule } from "./job-distribution/job-distribution.module";
 import { AwsModule } from "./aws/aws.module";
 import { ConfigModule } from "@nestjs/config";
+import { GitHubModule } from "./github/github.module";
 
 @Module({
 	imports: [
@@ -18,6 +19,7 @@ import { ConfigModule } from "@nestjs/config";
 		JobModule,
 		JobDistributionModule,
 		AwsModule,
+		GitHubModule,
 	],
 	controllers: [],
   providers: [],
