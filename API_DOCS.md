@@ -267,6 +267,106 @@
   }
 ```
 
+### 13. 记录任务最终选中的Agent
+
+- **URL**: `POST /jobs/:id/select-final-agent`
+- **描述**: 记录任务最终选中的Agent
+- **路径参数**:
+  - `id`: Job ID
+- **请求体**:
+
+```json
+{
+  "agentId": "string" // 选中的Agent ID
+}
+```
+
+- **响应**:
+
+```json
+{
+  "distributionRecord": "分发记录信息",
+  "selectedAgent": "选中的Agent信息",
+  "message": "Successfully selected agent [AgentName] for job [JobTitle]"
+}
+```
+
+### 14. 获取任务执行结果
+
+- **URL**: `GET /jobs/:id/execution-results`
+- **描述**: 获取任务的执行结果和Agent工作状态
+- **路径参数**:
+  - `id`: Job ID
+- **响应**:
+
+```json
+{
+  "job": {
+    "id": "string",
+    "jobTitle": "string",
+    "status": "JobStatus",
+    "createdAt": "datetime",
+    "assignedAgentId": "string | null", // 最终选中的Agent ID
+    "assignedAgentName": "string | null" // 最终选中的Agent名称
+  },
+  "summary": {
+    "total": "number", // 总分配Agent数量
+    "completed": "number", // 已完成数量
+    "failed": "number", // 失败数量
+    "working": "number", // 工作中数量
+    "assigned": "number" // 已分配但未开始数量
+  },
+  "results": [
+    {
+      "agent": {
+        "id": "string",
+        "agentName": "string",
+        "agentAddress": "string",
+        "reputation": "number",
+        "successRate": "number",
+        "pricePerCall": "number"
+      },
+      "workStatus": "AgentWorkStatus",
+      "assignedAt": "datetime",
+      "startedAt": "datetime | null",
+      "completedAt": "datetime | null",
+      "executionTimeMs": "number | null",
+      "progress": "number | null",
+      "retryCount": "number",
+      "executionResult": "string | null", // Agent执行结果(JSON字符串)
+      "errorMessage": "string | null"
+    }
+  ]
+}
+```
+
+### 15. 获取任务最终选中的Agent
+
+- **URL**: `GET /jobs/:id/final-selected-agent`
+- **描述**: 获取任务最终选中的Agent信息
+- **路径参数**:
+  - `id`: Job ID
+- **响应**:
+
+```json
+{
+  "job": {
+    "id": "string",
+    "jobTitle": "string",
+    "status": "JobStatus"
+  },
+  "finalSelectedAgent": "Agent对象 | null",
+  "selectedAt": "Already selected | Not selected yet",
+  "allAssignedAgents": [
+    {
+      "agent": "Agent对象",
+      "workStatus": "AgentWorkStatus",
+      "isSelected": "boolean"
+    }
+  ]
+}
+```
+
 ---
 
 ## 数据模型
@@ -385,4 +485,26 @@ curl -X POST http://localhost:3000/jobs \
     "isPublic": true,
     "walletAddress": "0x1234567890abcdef"
   }'
+```
+
+### 记录任务最终选中的Agent示例
+
+```bash
+curl -X POST http://localhost:3000/jobs/job123/select-final-agent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agentId": "agent456"
+  }'
+```
+
+### 获取任务执行结果示例
+
+```bash
+curl -X GET http://localhost:3000/jobs/job123/execution-results
+```
+
+### 获取任务最终选中的Agent示例
+
+```bash
+curl -X GET http://localhost:3000/jobs/job123/final-selected-agent
 ```

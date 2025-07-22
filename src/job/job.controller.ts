@@ -138,6 +138,32 @@ export class JobController {
     return this.jobService.getExecutionResults(id);
   }
 
+  @Post(':id/select-final-agent')
+  @ApiOperation({ summary: '记录任务最终选中的Agent' })
+  @ApiParam({ name: 'id', description: '任务ID' })
+  @ApiBody({ schema: {
+    type: 'object',
+    properties: {
+      agentId: {
+        type: 'string',
+        description: '选中的Agent ID'
+      }
+    },
+    required: ['agentId']
+  }})
+  @ApiResponse({ status: 200, description: '记录成功' })
+  selectFinalAgent(@Param('id') id: string, @Body() body: { agentId: string }) {
+    return this.jobService.selectFinalAgent(id, body.agentId);
+  }
+
+  @Get(':id/final-selected-agent')
+  @ApiOperation({ summary: '获取任务最终选中的Agent' })
+  @ApiParam({ name: 'id', description: '任务ID' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  getFinalSelectedAgent(@Param('id') id: string) {
+    return this.jobService.getFinalSelectedAgent(id);
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: '删除任务' })
   @ApiParam({ name: 'id', description: '任务ID' })

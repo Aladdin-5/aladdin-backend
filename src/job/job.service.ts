@@ -398,8 +398,6 @@ export class JobService {
 					priority: job.priority,
 				},
 				totalAgents: agents.length,
-				assignedAgentId: agents[0].id,
-				assignedAgentName: agents[0].agentName,
 			},
 		});
 
@@ -598,7 +596,8 @@ export class JobService {
 								agentName: true,
 								agentAddress: true,
 								reputation: true,
-								successRate: true
+								successRate: true,
+								pricePerCall: true
 							}
 						}
 					},
@@ -639,10 +638,138 @@ export class JobService {
 				id: distributionRecord.job.id,
 				jobTitle: distributionRecord.job.jobTitle,
 				status: distributionRecord.job.status,
-				createdAt: distributionRecord.job.createdAt
+				createdAt: distributionRecord.job.createdAt,
+				assignedAgentId: distributionRecord.assignedAgentId,
+				assignedAgentName: distributionRecord.assignedAgentName,
 			},
 			summary,
 			results
+		};
+	}
+
+	/**
+	 * 记录任务最终选中的Agent
+	 * @param jobId 任务ID
+	 * @param agentId 选中的Agent ID
+	 * @returns 更新后的分发记录
+	 */
+	async selectFinalAgent(jobId: string, agentId: string) {
+		// 检查任务是否存在
+		const job = await this.prisma.job.findUnique({
+			where: { id: jobId },
+			include: {
+				distributionRecord: {
+					include: {
+						assignedAgents: {
+							include: {
+								agent: true
+							}
+						}
+					}
+				}
+			}
+		});
+
+		if (!job) {
+			throw new Error(`Job with ID ${jobId} not found`);
+		}
+
+		if (!job.distributionRecord) {
+			throw new Error(`No distribution record found for job ${jobId}`);
+		}
+
+		// 检查指定的Agent是否在分配列表中
+		const assignedAgent = job.distributionRecord.assignedAgents.find(
+			agentRecord => agentRecord.agentId === agentId
+		);
+
+		if (!assignedAgent) {
+			throw new Error(`Agent with ID ${agentId} is not assigned to job ${jobId}`);
+		}
+
+		// 更新分发记录中的最终选中Agent
+		const updatedRecord = await this.prisma.jobDistributionRecord.update({
+			where: { id: job.distributionRecord.id },
+			data: {
+				assignedAgentId: agentId,
+				assignedAgentName: assignedAgent.agent.agentName
+			},
+			include: {
+				job: true,
+				assignedAgents: {
+					include: {
+						agent: true
+					}
+				}
+			}
+		});
+
+		this.logger.log(`任务 ${jobId} 最终选中Agent: ${assignedAgent.agent.agentName} (${agentId})`);
+
+		return {
+			distributionRecord: updatedRecord,
+			selectedAgent: assignedAgent.agent,
+			message: `Successfully selected agent ${assignedAgent.agent.agentName} for job ${job.jobTitle}`
+		};
+	}
+
+	/**
+	 * 获取任务最终选中的Agent
+	 * @param jobId 任务ID
+	 * @returns 最终选中的Agent信息
+	 */
+	async getFinalSelectedAgent(jobId: string) {
+		const distributionRecord = await this.prisma.jobDistributionRecord.findFirst({
+			where: { jobId },
+			include: {
+				job: true,
+				assignedAgents: {
+					include: {
+						agent: true
+					}
+				}
+			}
+		});
+
+		if (!distributionRecord) {
+			throw new Error(`No distribution record found for job ${jobId}`);
+		}
+
+		// 如果有最终选中的Agent
+		if (distributionRecord.assignedAgentId) {
+			const selectedAgentRecord = distributionRecord.assignedAgents.find(
+				agentRecord => agentRecord.agentId === distributionRecord.assignedAgentId
+			);
+
+			return {
+				job: {
+					id: distributionRecord.job.id,
+					jobTitle: distributionRecord.job.jobTitle,
+					status: distributionRecord.job.status
+				},
+				finalSelectedAgent: selectedAgentRecord?.agent || null,
+				selectedAt: distributionRecord.assignedAgentId ? 'Already selected' : 'Not selected yet',
+				allAssignedAgents: distributionRecord.assignedAgents.map(agentRecord => ({
+					agent: agentRecord.agent,
+					workStatus: agentRecord.workStatus,
+					isSelected: agentRecord.agentId === distributionRecord.assignedAgentId
+				}))
+			};
+		}
+
+		return {
+			job: {
+				id: distributionRecord.job.id,
+				jobTitle: distributionRecord.job.jobTitle,
+				status: distributionRecord.job.status
+			},
+			finalSelectedAgent: null,
+			selectedAt: 'Not selected yet',
+			allAssignedAgents: distributionRecord.assignedAgents.map(agentRecord => ({
+				agent: agentRecord.agent,
+				workStatus: agentRecord.workStatus,
+				isSelected: false
+			}))
 		};
 	}
 }
