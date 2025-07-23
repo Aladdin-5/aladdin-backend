@@ -597,7 +597,8 @@ export class JobService {
 								agentAddress: true,
 								reputation: true,
 								successRate: true,
-								pricePerCall: true
+								pricePerCall: true,
+								walletAddress: true
 							}
 						}
 					},
